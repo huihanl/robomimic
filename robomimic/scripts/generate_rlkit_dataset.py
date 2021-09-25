@@ -162,7 +162,7 @@ if __name__ == "__main__":
         n = len(demos)
 
     for ind in range(n):
-
+        print("at traj: ", ind)
         traj = dict(
             observations=[],
             actions=[],
@@ -179,13 +179,16 @@ if __name__ == "__main__":
         ee_pos = f["data/{}/obs/robot0_eef_pos".format(ep)][()]
         ee_quat = f["data/{}/obs/robot0_eef_quat".format(ep)][()]
         gripper_pos = f["data/{}/obs/robot0_gripper_qpos".format(ep)][()]
-        obs = np.concatenate([ee_pos, ee_quat, gripper_pos], axis=1)
+        object_info = f["data/{}/obs/object".format(ep)][()]
+
+        obs = np.concatenate([ee_pos, ee_quat, gripper_pos, object_info], axis=1)
         obs = list(obs)
 
         next_ee_pos = f["data/{}/next_obs/robot0_eef_pos".format(ep)][()]
         next_ee_quat = f["data/{}/next_obs/robot0_eef_quat".format(ep)][()]
         next_gripper_pos = f["data/{}/next_obs/robot0_gripper_qpos".format(ep)][()]
-        next_obs = np.concatenate([next_ee_pos, next_ee_quat, next_gripper_pos], axis=1)
+        next_object_info = f["data/{}/next_obs/object".format(ep)][()]
+        next_obs = np.concatenate([next_ee_pos, next_ee_quat, next_gripper_pos, next_object_info], axis=1)
         next_obs = list(next_obs)
 
         traj["observations"] = obs
@@ -196,10 +199,9 @@ if __name__ == "__main__":
 
         rlkit_data.append(traj)
 
-        filename = os.path.basename(args.dataset)[:-5] + ".npy"
-        path = osp.join(args.data_save_path, filename)
-        print(path)
-        np.save(path, rlkit_data)
+    filename = os.path.basename(args.dataset)[:-5] + "_wobj.npy"
+    path = osp.join(args.data_save_path, filename)
+    print(path)
+    np.save(path, rlkit_data)
 
-        np.save(path, rlkit_data)
 
