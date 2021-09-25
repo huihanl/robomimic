@@ -12,43 +12,50 @@ import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.file_utils as FileUtils
 from robomimic.envs.env_base import EnvBase
 
+
+def playback_video(
+    env,
+    initial_state,
+    states,
+    actions
+):
+    assert isinstance(env, EnvBase)
+    # load the initial state
+    env.reset()
+    env.reset_to(initial_state)
+    traj_len = states.shape[0]
+    video = []
+    for i in range(traj_len):
+        env.reset_to({"states": states[i]})
+        img = env.render(mode="rgb_array", height=48, width=48, camera_name='agentview')
+        video.append(img)
+    env.step(actions[-1])
+    img = env.render(mode="rgb_array", height=48, width=48, camera_name='agentview')
+    video.append(img)
+    assert len(video) == len(states) + 1
+    return video
+
 def playback_dataset(args):
-    # some arg checking
-    write_video = (args.video_path is not None)
-    assert not (args.render and write_video) # either on-screen or video but not both
-    if args.render:
-        # on-screen rendering can only support one camera
-        assert len(args.render_image_names) == 1
-    if args.use_obs:
-        assert write_video, "playback with observations can only write to video"
-        assert not args.use_actions, "playback with observations is offline and does not support action playback"
 
-    # create environment only if not playing back with observations
-    if not args.use_obs:
-        # need to make sure ObsUtils knows which observations are images, but it doesn't matter 
-        # for playback since observations are unused. Pass a dummy spec here.
-        dummy_spec = dict(
-            obs=dict(
-                    low_dim=["robot0_eef_pos"],
-                    image=[],
-                ),
-        )
-        ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
+    # need to make sure ObsUtils knows which observations are images, but it doesn't matter
+    # for playback since observations are unused. Pass a dummy spec here.
+    dummy_spec = dict(
+        obs=dict(
+                low_dim=["robot0_eef_pos"],
+                image=[],
+            ),
+    )
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
 
-        env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
-        env = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=args.render, render_offscreen=write_video)
+    env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
+    env = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
 
-        # some operations for playback are robosuite-specific, so determine if this environment is a robosuite env
-        is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
+    # some operations for playback are robosuite-specific, so determine if this environment is a robosuite env
+    is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
 
     f = h5py.File(args.dataset, "r")
 
-    # list of all demonstration episodes (sorted in increasing number order)
-    if args.filter_key is not None:
-        print("using filter key: {}".format(args.filter_key))
-        demos = [elem.decode("utf-8") for elem in np.array(f["mask/{}".format(args.filter_key)])]
-    else:
-        demos = list(f["data"].keys())
+    demos = list(f["data"].keys())
     inds = np.argsort([int(elem[5:]) for elem in demos])
     demos = [demos[i] for i in inds]
 
@@ -56,50 +63,30 @@ def playback_dataset(args):
     if args.n is not None:
         demos = demos[:args.n]
 
-    # maybe dump video
-    video_writer = None
-    if write_video:
-        video_writer = imageio.get_writer(args.video_path, fps=20)
-
+    video_lst = []
     for ind in range(len(demos)):
         ep = demos[ind]
         print("Playing back episode: {}".format(ep))
 
-        if args.use_obs:
-            playback_trajectory_with_obs(
-                traj_grp=f["data/{}".format(ep)], 
-                video_writer=video_writer, 
-                video_skip=args.video_skip,
-                image_names=args.render_image_names,
-                first=args.first,
-            )
-            continue
-
         # prepare initial state to reload from
         states = f["data/{}/states".format(ep)][()]
+        actions = f["data/{}/actions".format(ep)][()]
         initial_state = dict(states=states[0])
+        print("initial state: ", initial_state)
         if is_robosuite_env:
             initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
 
-        # supply actions if using open-loop action playback
-        actions = None
-        if args.use_actions:
-            actions = f["data/{}/actions".format(ep)][()]
-
-        playback_trajectory_with_env(
+        video = playback_video(
             env=env, 
             initial_state=initial_state, 
-            states=states, actions=actions, 
-            render=args.render, 
-            video_writer=video_writer, 
-            video_skip=args.video_skip,
-            camera_names=args.render_image_names,
-            first=args.first,
+            states=states,
+            actions=actions,
         )
 
+        video_lst.append(video)
+
     f.close()
-    if write_video:
-        video_writer.close()
+    return video_lst
 
 
 if __name__ == "__main__":
@@ -113,7 +100,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-save-path",
         type=str,
-        default="/home/huihanl/",
+        default="/Users/huihanliu/",
         help="data save path",
     )
 
@@ -191,17 +178,26 @@ if __name__ == "__main__":
         next_obs = np.concatenate([next_ee_pos, next_ee_quat, next_gripper_pos, next_object_info], axis=1)
         next_obs = list(next_obs)
 
-        traj["observations"] = obs
+        traj["observations"] = [{"state": o} for o in obs]
         traj["actions"] = actions
         traj["rewards"] = rewards
-        traj["next_observations"] = next_obs
+        traj["next_observations"] = [{"state": o} for o in next_obs]
         traj["terminals"] = dones
 
         rlkit_data.append(traj)
 
-    filename = os.path.basename(args.dataset)[:-5] + "_wobj.npy"
+    video_lst = playback_dataset(args)
+
+    for id in range(len(rlkit_data)):
+        video = video_lst[id]
+        for vid in range(len(rlkit_data[id]["observations"])):
+            rlkit_data[id]["observations"][vid]["image"] = video[vid]
+
+        for vid in range(1, len(rlkit_data[id]["observations"]) + 1):
+            rlkit_data[id]["next_observations"][vid - 1]["image"] = video[vid]
+
+    filename = os.path.basename(args.dataset)[:-5] + ".npy"
     path = osp.join(args.data_save_path, filename)
     print(path)
     np.save(path, rlkit_data)
-
 
