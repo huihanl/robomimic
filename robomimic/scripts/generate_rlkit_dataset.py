@@ -48,7 +48,7 @@ def playback_dataset(args):
     ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
 
     env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
-    env = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
+    env = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=False)
 
     # some operations for playback are robosuite-specific, so determine if this environment is a robosuite env
     is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
@@ -72,7 +72,6 @@ def playback_dataset(args):
         states = f["data/{}/states".format(ep)][()]
         actions = f["data/{}/actions".format(ep)][()]
         initial_state = dict(states=states[0])
-        print("initial state: ", initial_state)
         if is_robosuite_env:
             initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
 
