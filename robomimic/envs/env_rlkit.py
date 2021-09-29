@@ -98,6 +98,7 @@ class EnvRLkitWrapper(EB.EnvBase):
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         info["success"] = self.env.is_success()["task"]
+        info["success"] = int(info["success"])
         return self.get_observation(), reward, done, info
 
     def reset_to(self, state):
