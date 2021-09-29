@@ -21,11 +21,13 @@ class EnvRLkitWrapper(EB.EnvBase):
         env_robosuite,  # EnvRobosuite object
         obs_img_dim=48,  # rendered image size
         transpose_image=True,  # transpose for pytorch by default
+        camera_names=['agentview'],
     ):
         self.env = env_robosuite
         self.observation_mode = 'pixels'
         self.obs_img_dim = obs_img_dim
         self.transpose_image = transpose_image
+        self.camera_names = camera_names
         self._set_observation_space()
         self._set_action_space()
         self._init_obs()
@@ -70,22 +72,44 @@ class EnvRLkitWrapper(EB.EnvBase):
         object_info = state_info['object']
 
         if self.observation_mode == 'pixels':
-            image_observation = self.env.render(mode="rgb_array",
-                                                height=self.obs_img_dim,
-                                                width=self.obs_img_dim,
-                                                camera_name="agentview")
-            if self.transpose_image:
-                image_observation = np.transpose(image_observation, (2, 0, 1))
-            image_observation = np.float32(image_observation.flatten()) / 255.0
 
-            observation = {
-                'state': np.concatenate(
-                    (robot0_eef_pos,
-                     robot0_eef_quat,
-                     robot0_gripper_qpos,
-                     object_info)),
-                'image': image_observation
-            }
+            if len(self.camera_names) == 1:
+                image_observation = self.env.render(mode="rgb_array",
+                                                    height=self.obs_img_dim,
+                                                    width=self.obs_img_dim,
+                                                    camera_name=self.camera_names[0])
+
+                if self.transpose_image:
+                    image_observation = np.transpose(image_observation, (2, 0, 1))
+                image_observation = np.float32(image_observation.flatten()) / 255.0
+
+                observation = {
+                    'state': np.concatenate(
+                        (robot0_eef_pos,
+                         robot0_eef_quat,
+                         robot0_gripper_qpos,
+                         object_info)),
+                    'image': image_observation
+                }
+            else:
+                observation = {
+                    'state': np.concatenate(
+                        (robot0_eef_pos,
+                         robot0_eef_quat,
+                         robot0_gripper_qpos,
+                         object_info))
+                }
+                for i in range(len(self.camera_names)):
+                    image_observation = self.env.render(mode="rgb_array",
+                                                        height=self.obs_img_dim,
+                                                        width=self.obs_img_dim,
+                                                        camera_name=self.camera_names[i])
+
+                    if self.transpose_image:
+                        image_observation = np.transpose(image_observation, (2, 0, 1))
+                    image_observation = np.float32(image_observation.flatten()) / 255.0
+                    observation[self.camera_names[i]] = image_observation
+
         else:
             raise NotImplementedError
 
