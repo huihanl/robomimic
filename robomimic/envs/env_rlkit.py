@@ -54,11 +54,13 @@ class EnvRLkitWrapper(EB.EnvBase):
             img_space = gym.spaces.Box(0, 1, (self.image_length,),
                                        dtype=np.float32)
 
-            robot_state_dim = 19 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2) + OBJECT (10)
+            robot_state_dim = 10 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2)
             obs_bound = 100
             obs_high = np.ones(robot_state_dim) * obs_bound
             state_space = gym.spaces.Box(-obs_high, obs_high)
-            spaces = {'image': img_space, 'state': state_space}
+            spaces = {'state': state_space}
+            for name in self.camera_names:
+                spaces[name] = img_space
             self.observation_space = gym.spaces.Dict(spaces)
         else:
             raise NotImplementedError
