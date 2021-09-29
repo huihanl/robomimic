@@ -17,8 +17,10 @@ def playback_video(
     env,
     initial_state,
     states,
-    actions
-):
+    actions,
+    img_dim,
+    camera_name,
+    ):
     assert isinstance(env, EnvBase)
     # load the initial state
     env.reset()
@@ -27,10 +29,10 @@ def playback_video(
     video = []
     for i in range(traj_len):
         env.reset_to({"states": states[i]})
-        img = env.render(mode="rgb_array", height=48, width=48, camera_name='agentview')
+        img = env.render(mode="rgb_array", height=img_dim, width=img_dim, camera_name=camera_name)
         video.append(img)
     env.step(actions[-1])
-    img = env.render(mode="rgb_array", height=48, width=48, camera_name='agentview')
+    img = env.render(mode="rgb_array", height=img_dim, width=img_dim, camera_name=camera_name)
     video.append(img)
     assert len(video) == len(states) + 1
     return video
@@ -63,7 +65,10 @@ def playback_dataset(args):
     if args.n is not None:
         demos = demos[:args.n]
 
-    video_lst = []
+    video_lst_keys = {}
+    for cam_name in args.camera_names:
+        video_lst_keys[cam_name] = []
+
     for ind in range(len(demos)):
         ep = demos[ind]
         print("Playing back episode: {}".format(ep))
@@ -74,18 +79,21 @@ def playback_dataset(args):
         initial_state = dict(states=states[0])
         if is_robosuite_env:
             initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
+        
+        for cam_name in args.camera_names:
+            video = playback_video(
+                env=env, 
+                initial_state=initial_state, 
+                states=states,
+                actions=actions,
+                img_dim=args.img_dim,
+                camera_name=cam_name,
+            )
 
-        video = playback_video(
-            env=env, 
-            initial_state=initial_state, 
-            states=states,
-            actions=actions,
-        )
-
-        video_lst.append(video)
+            video_lst_keys[cam_name].append(video)
 
     f.close()
-    return video_lst
+    return video_lst_keys
 
 
 if __name__ == "__main__":
@@ -130,6 +138,20 @@ if __name__ == "__main__":
         "--render",
         action='store_true',
         help="on-screen rendering",
+    )
+
+    parser.add_argument(
+        "--img_dim",
+        type=int,
+        default=84,
+    )
+
+    parser.add_argument(
+        "--camera_names",
+        type=str,
+        nargs='+',
+        default=[],
+        help="camera name(s) to use for image observations. Leave out to not use image observations.",
     )
 
     args = parser.parse_args()
@@ -188,20 +210,22 @@ if __name__ == "__main__":
 
         rlkit_data.append(traj)
 
-    video_lst = playback_dataset(args)
-    np.save("video_lst.npy", video_lst)
 
-    for id in range(len(rlkit_data)):
-        video = video_lst[id]
-        print("len(video): ", len(video))
-        print("len(rlkit_data[id][observations]): ", len(rlkit_data[id]["observations"]))
-        for vid in range(len(rlkit_data[id]["observations"])):
-            rlkit_data[id]["observations"][vid]["image"] = video[vid]
+    video_lst_dict = playback_dataset(args) # a dict of images from all camera views
+    np.save("video_lst_dict.npy", video_lst_dict)
 
-        for vid in range(1, len(rlkit_data[id]["observations"]) + 1):
-            rlkit_data[id]["next_observations"][vid - 1]["image"] = video[vid]
+    for camera_name in video_lst_dict:
+        video_lst = video_lst_dict[camera_name]
+        for id in range(len(rlkit_data)):
+            video = video_lst[id]
+            for vid in range(len(rlkit_data[id]["observations"])):
+                rlkit_data[id]["observations"][vid][camera_name] = video[vid]
 
-    filename = os.path.basename(args.dataset)[:-5] + ".npy"
+            for vid in range(1, len(rlkit_data[id]["observations"]) + 1):
+                rlkit_data[id]["next_observations"][vid - 1][camera_name] = video[vid]
+
+    camera_name_str = '_'.join(args.camera_names) + "_{}_{}".format(args.img_dim, args.n if args.n else "full")
+    filename = os.path.basename(args.dataset)[:-5] + "{}.npy".format(camera_name_str)
     path = osp.join(args.data_save_path, filename)
     print(path)
     np.save(path, rlkit_data)
