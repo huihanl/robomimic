@@ -137,6 +137,8 @@ if __name__ == "__main__":
     f = h5py.File(args.dataset, "r")
 
     demos = list(f["data"].keys())
+    inds = np.argsort([int(elem[5:]) for elem in demos])
+    demos = [demos[i] for i in inds]
     attributes = list(f["data/{}".format(demos[0])].keys())
     print("attributes: ", attributes)
 
@@ -146,6 +148,7 @@ if __name__ == "__main__":
         n = args.n
     else:
         n = len(demos)
+
 
     for ind in range(n):
         print("at traj: ", ind)
@@ -186,9 +189,12 @@ if __name__ == "__main__":
         rlkit_data.append(traj)
 
     video_lst = playback_dataset(args)
+    np.save("video_lst.npy", video_lst)
 
     for id in range(len(rlkit_data)):
         video = video_lst[id]
+        print("len(video): ", len(video))
+        print("len(rlkit_data[id][observations]): ", len(rlkit_data[id]["observations"]))
         for vid in range(len(rlkit_data[id]["observations"])):
             rlkit_data[id]["observations"][vid]["image"] = video[vid]
 
