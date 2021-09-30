@@ -12,103 +12,6 @@ import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.file_utils as FileUtils
 from robomimic.envs.env_base import EnvBase
 
-
-def playback_video(
-    env,
-    initial_state,
-    states,
-    actions,
-    img_dim,
-    camera_name,
-    ):
-    assert isinstance(env, EnvBase)
-    # load the initial state
-    env.reset()
-    env.reset_to(initial_state)
-    traj_len = states.shape[0]
-    video = []
-    for i in range(traj_len):
-        env.reset_to({"states": states[i]})
-        img = env.render(mode="rgb_array", height=img_dim, width=img_dim, camera_name=camera_name)
-        video.append(img)
-    env.step(actions[-1])
-    img = env.render(mode="rgb_array", height=img_dim, width=img_dim, camera_name=camera_name)
-    video.append(img)
-    assert len(video) == len(states) + 1
-    return video
-
-def playback_dataset(args):
-
-    # need to make sure ObsUtils knows which observations are images, but it doesn't matter
-    # for playback since observations are unused. Pass a dummy spec here.
-    image_modalities = ["image"]
-    obs_modality_specs = {
-        "obs": {
-            "low_dim": [],  # technically unused, so we don't have to specify all of them
-            "image": image_modalities,
-        }
-    }
-    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=obs_modality_specs)
-
-    env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
-
-    env = EnvUtils.create_env_from_metadata(env_meta=env_meta,
-                                            render=False,
-                                            render_offscreen=True,
-                                            use_image_obs=True)
-
-    # some operations for playback are robosuite-specific, so determine if this environment is a robosuite env
-    is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
-
-    f = h5py.File(args.dataset, "r")
-
-    demos = list(f["data"].keys())
-    inds = np.argsort([int(elem[5:]) for elem in demos])
-    demos = [demos[i] for i in inds]
-
-    # maybe reduce the number of demonstrations to playback
-    if args.n is not None:
-        demos = demos[:args.n]
-
-    video_lst_keys = {}
-    for cam_name in args.camera_names:
-        video_lst_keys[cam_name] = []
-
-    start = args.start_id
-    end = args.end_id
-    for ind in range(start, end):
-        ep = demos[ind]
-        print("Playing back episode: {}".format(ep))
-
-        # prepare initial state to reload from
-        states = f["data/{}/states".format(ep)][()]
-        actions = f["data/{}/actions".format(ep)][()]
-        initial_state = dict(states=states[0])
-        if is_robosuite_env:
-            initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
-
-
-        for cam_name in args.camera_names:
-            video = playback_video(
-                env=env, 
-                initial_state=initial_state, 
-                states=states,
-                actions=actions,
-                img_dim=args.img_dim,
-                camera_name=cam_name,
-            )
-
-            video_lst_keys[cam_name].append(video)
-            np.save("video_lst_dict_start_at_{}.npy".format(start), video_lst_keys)
-            # video_writer = imageio.get_writer("ep_{}_cam_name_{}.mp4".format(ep, cam_name), fps=20)
-            # for v in video:
-            #     video_writer.append_data(v)
-            # video_writer.close()
-
-    f.close()
-    return video_lst_keys
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -124,25 +27,12 @@ if __name__ == "__main__":
         help="data save path",
     )
 
+    # number of trajectories to playback. If omitted, playback all of them.
     parser.add_argument(
         "--n",
         type=int,
         default=None,
-        help="Number of trajectories from the start (optional)",
-    )
-
-    parser.add_argument(
-        "--start-id",
-        type=int,
-        default=None,
-        help="Specify starting id to tackle rendering quit issue",
-    )
-
-    parser.add_argument(
-        "--end-id",
-        type=int,
-        default=None,
-        help="Specify ending id to tackle rendering quit issue",
+        help="(optional) stop after n trajectories are played",
     )
 
     # Use image observations instead of doing playback using the simulator env.
@@ -180,7 +70,17 @@ if __name__ == "__main__":
         help="camera name(s) to use for image observations. Leave out to not use image observations.",
     )
 
+    parser.add_argument(
+        "--video_file_paths",
+        type=str,
+        nargs='+',
+        default=[],
+        help="saved videos",
+    )
+
     args = parser.parse_args()
+
+    video_paths = args.video_file_paths
 
     f = h5py.File(args.dataset, "r")
 
@@ -216,16 +116,16 @@ if __name__ == "__main__":
         ee_pos = f["data/{}/obs/robot0_eef_pos".format(ep)][()]
         ee_quat = f["data/{}/obs/robot0_eef_quat".format(ep)][()]
         gripper_pos = f["data/{}/obs/robot0_gripper_qpos".format(ep)][()]
-        object_info = f["data/{}/obs/object".format(ep)][()]
+        #object_info = f["data/{}/obs/object".format(ep)][()]
 
-        obs = np.concatenate([ee_pos, ee_quat, gripper_pos, object_info], axis=1)
+        obs = np.concatenate([ee_pos, ee_quat, gripper_pos], axis=1)
         obs = list(obs)
 
         next_ee_pos = f["data/{}/next_obs/robot0_eef_pos".format(ep)][()]
         next_ee_quat = f["data/{}/next_obs/robot0_eef_quat".format(ep)][()]
         next_gripper_pos = f["data/{}/next_obs/robot0_gripper_qpos".format(ep)][()]
-        next_object_info = f["data/{}/next_obs/object".format(ep)][()]
-        next_obs = np.concatenate([next_ee_pos, next_ee_quat, next_gripper_pos, next_object_info], axis=1)
+        #next_object_info = f["data/{}/next_obs/object".format(ep)][()]
+        next_obs = np.concatenate([next_ee_pos, next_ee_quat, next_gripper_pos], axis=1)
         next_obs = list(next_obs)
 
         traj["observations"] = [{"state": o} for o in obs]
@@ -237,7 +137,21 @@ if __name__ == "__main__":
         rlkit_data.append(traj)
 
 
-    video_lst_dict = playback_dataset(args) # a dict of images from all camera views
+    video_lst_dict = np.load(video_paths[0], allow_pickle=True).item()
+    print(len(video_lst_dict['frontview']))
+    print(len(video_lst_dict['robot0_eye_in_hand']))
+    for i in range(1, len(video_paths)):
+        new_video = np.load(video_paths[i], allow_pickle=True).item()
+        if i == 4:
+            new_video = np.load(video_paths[i], allow_pickle=True).item()
+            new_video["frontview"] = new_video["frontview"][:-1]
+        print(len(new_video['frontview']))
+        print(len(new_video['robot0_eye_in_hand']))
+        for k in video_lst_dict:
+            video_lst_dict[k] += new_video[k]
+    #import pdb; pdb.set_trace()
+    for k in video_lst_dict:
+        assert len(video_lst_dict[k]) == 200
 
     for camera_name in video_lst_dict:
         video_lst = video_lst_dict[camera_name]
