@@ -22,9 +22,11 @@ class EnvRLkitWrapper(EB.EnvBase):
         obs_img_dim=48,  # rendered image size
         transpose_image=True,  # transpose for pytorch by default
         camera_names=['agentview'],
+        observation_mode='pixels',
     ):
         self.env = env_robosuite
-        self.observation_mode = 'pixels'
+        self.observation_mode = observation_mode
+        assert self.observation_mode in ["pixels", "states"]
         self.obs_img_dim = obs_img_dim
         self.transpose_image = transpose_image
         self.camera_names = camera_names
@@ -62,6 +64,15 @@ class EnvRLkitWrapper(EB.EnvBase):
             for name in self.camera_names:
                 spaces[name] = img_space
             self.observation_space = gym.spaces.Dict(spaces)
+        elif self.observation_mode == 'states':
+            robot_state_dim = 9 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2) + OBJECT_INFO
+            obs_bound = 100
+            obs_high = np.ones(robot_state_dim) * obs_bound
+            state_space = gym.spaces.Box(-obs_high, obs_high)
+            spaces = {'state': state_space}
+            for name in self.camera_names:
+                spaces[name] = img_space
+            self.observation_space = gym.spaces.Dict(spaces)
         else:
             raise NotImplementedError
 
@@ -71,7 +82,7 @@ class EnvRLkitWrapper(EB.EnvBase):
         robot0_eef_pos = state_info['robot0_eef_pos']
         robot0_eef_quat = state_info['robot0_eef_quat']
         robot0_gripper_qpos = state_info['robot0_gripper_qpos']
-        #object_info = state_info['object']
+        object_info = state_info['object']
 
         if self.observation_mode == 'pixels':
 
@@ -122,6 +133,14 @@ class EnvRLkitWrapper(EB.EnvBase):
                     image_observation = np.float32(image_observation.flatten()) / 255.0
                     observation['image'] = image_observation
 
+        elif self.observation_mode == 'states':
+            observation = {
+                'state': np.concatenate(
+                    (robot0_eef_pos,
+                     robot0_eef_quat,
+                     robot0_gripper_qpos,
+                     object_info)),
+            }
         else:
             raise NotImplementedError
 
