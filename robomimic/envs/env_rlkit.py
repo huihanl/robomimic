@@ -54,7 +54,7 @@ class EnvRLkitWrapper(EB.EnvBase):
             img_space = gym.spaces.Box(0, 1, (self.image_length,),
                                        dtype=np.float32)
 
-            robot_state_dim = 10 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2)
+            robot_state_dim = 9 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2)
             obs_bound = 100
             obs_high = np.ones(robot_state_dim) * obs_bound
             state_space = gym.spaces.Box(-obs_high, obs_high)
@@ -71,7 +71,7 @@ class EnvRLkitWrapper(EB.EnvBase):
         robot0_eef_pos = state_info['robot0_eef_pos']
         robot0_eef_quat = state_info['robot0_eef_quat']
         robot0_gripper_qpos = state_info['robot0_gripper_qpos']
-        object_info = state_info['object']
+        #object_info = state_info['object']
 
         if self.observation_mode == 'pixels':
 
@@ -89,8 +89,8 @@ class EnvRLkitWrapper(EB.EnvBase):
                     'state': np.concatenate(
                         (robot0_eef_pos,
                          robot0_eef_quat,
-                         robot0_gripper_qpos,
-                         object_info)),
+                         robot0_gripper_qpos)),
+                         #object_info)),
                     'image': image_observation
                 }
             else:
@@ -98,8 +98,8 @@ class EnvRLkitWrapper(EB.EnvBase):
                     'state': np.concatenate(
                         (robot0_eef_pos,
                          robot0_eef_quat,
-                         robot0_gripper_qpos,
-                         object_info))
+                         robot0_gripper_qpos)),
+                         #object_info))
                 }
                 for i in range(len(self.camera_names)):
                     image_observation = self.env.render(mode="rgb_array",
@@ -111,6 +111,16 @@ class EnvRLkitWrapper(EB.EnvBase):
                         image_observation = np.transpose(image_observation, (2, 0, 1))
                     image_observation = np.float32(image_observation.flatten()) / 255.0
                     observation[self.camera_names[i]] = image_observation
+
+                    image_observation = self.env.render(mode="rgb_array",
+                                                        height=self.obs_img_dim,
+                                                        width=self.obs_img_dim,
+                                                        camera_name='frontview')
+
+                    if self.transpose_image:
+                        image_observation = np.transpose(image_observation, (2, 0, 1))
+                    image_observation = np.float32(image_observation.flatten()) / 255.0
+                    observation['image'] = image_observation
 
         else:
             raise NotImplementedError
