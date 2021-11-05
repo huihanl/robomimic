@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-save-path",
         type=str,
-        default="/Users/huihanliu/",
+        default="/home/huihanl",
         help="data save path",
     )
 
@@ -76,6 +76,11 @@ if __name__ == "__main__":
         nargs='+',
         default=[],
         help="saved videos",
+    )
+    
+    parser.add_argument(
+        "--task_name",
+        type=str,
     )
 
     args = parser.parse_args()
@@ -142,9 +147,6 @@ if __name__ == "__main__":
     print(len(video_lst_dict['robot0_eye_in_hand']))
     for i in range(1, len(video_paths)):
         new_video = np.load(video_paths[i], allow_pickle=True).item()
-        if i == 4:
-            new_video = np.load(video_paths[i], allow_pickle=True).item()
-            new_video["frontview"] = new_video["frontview"][:-1]
         print(len(new_video['frontview']))
         print(len(new_video['robot0_eye_in_hand']))
         for k in video_lst_dict:
@@ -164,7 +166,7 @@ if __name__ == "__main__":
                 rlkit_data[id]["next_observations"][vid - 1][camera_name] = video[vid]
 
     camera_name_str = '_'.join(args.camera_names) + "_{}_{}".format(args.img_dim, args.n if args.n else "full")
-    filename = os.path.basename(args.dataset)[:-5] + "_{}.npy".format(camera_name_str)
+    filename = args.task_name + "_{}.npy".format(camera_name_str)
     path = osp.join(args.data_save_path, filename)
     print(path)
     np.save(path, rlkit_data)

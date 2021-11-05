@@ -120,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-save-path",
         type=str,
-        default="/Users/huihanliu/",
+        default="/mnt/data0/huihanl/",
         help="data save path",
     )
 
@@ -173,6 +173,11 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--task",
+        type=str,
+    )
+
+    parser.add_argument(
         "--camera_names",
         type=str,
         nargs='+',
@@ -217,7 +222,8 @@ if __name__ == "__main__":
         ee_quat = f["data/{}/obs/robot0_eef_quat".format(ep)][()]
         gripper_pos = f["data/{}/obs/robot0_gripper_qpos".format(ep)][()]
         object_info = f["data/{}/obs/object".format(ep)][()]
-
+        import pdb; pdb.set_trace()
+        
         obs = np.concatenate([ee_pos, ee_quat, gripper_pos, object_info], axis=1)
         obs = list(obs)
 
@@ -236,6 +242,13 @@ if __name__ == "__main__":
 
         rlkit_data.append(traj)
 
+    if len(args.camera_names) == 0:
+        camera_name_str = "state_only" + "_{}".format(args.n if args.n else "full")
+        filename = args.task + "_{}.npy".format(camera_name_str)
+        path = osp.join(args.data_save_path, filename)
+        print(path)
+        np.save(path, rlkit_data)
+        exit()
 
     video_lst_dict = playback_dataset(args) # a dict of images from all camera views
 
@@ -250,7 +263,7 @@ if __name__ == "__main__":
                 rlkit_data[id]["next_observations"][vid - 1][camera_name] = video[vid]
 
     camera_name_str = '_'.join(args.camera_names) + "_{}_{}".format(args.img_dim, args.n if args.n else "full")
-    filename = os.path.basename(args.dataset)[:-5] + "_{}.npy".format(camera_name_str)
+    filename = args.task + "_{}.npy".format(camera_name_str)
     path = osp.join(args.data_save_path, filename)
     print(path)
     np.save(path, rlkit_data)

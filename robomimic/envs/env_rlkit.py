@@ -65,12 +65,13 @@ class EnvRLkitWrapper(EB.EnvBase):
                 spaces[name] = img_space
             self.observation_space = gym.spaces.Dict(spaces)
         elif self.observation_mode == 'states':
-            if self.env.name == "Lift":
-                robot_state_dim = 7 + 10 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2) + OBJECT_INFO
-            elif self.env.name in ["Can", "Square"]:
-                robot_state_dim = 7 + 14
-            elif self.env.name == "Transport":
-                robot_state_dim = 41
+            print("self.env.name: ", self.env.name)
+            if "Lift" in self.env.name:
+                robot_state_dim = 9 + 10 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2) + OBJECT_INFO
+            elif "Can" in self.env.name or "Square" in self.env.name:
+                robot_state_dim = 9 + 14
+            elif "Transport" in self.env.name:
+                robot_state_dim = 9 + 41
             
             obs_bound = 100
             obs_high = np.ones(robot_state_dim) * obs_bound
