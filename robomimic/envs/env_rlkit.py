@@ -134,13 +134,25 @@ class EnvRLkitWrapper(EB.EnvBase):
                     observation['image'] = image_observation
 
         elif self.observation_mode == 'states':
+
+            image_observation = self.env.render(mode="rgb_array",
+                                                height=self.obs_img_dim,
+                                                width=self.obs_img_dim,
+                                                camera_name=self.camera_names[0])
+
+            if self.transpose_image:
+                image_observation = np.transpose(image_observation, (2, 0, 1))
+            image_observation = np.float32(image_observation.flatten()) / 255.0
+
             observation = {
                 'state': np.concatenate(
                     (robot0_eef_pos,
                      robot0_eef_quat,
                      robot0_gripper_qpos,
                      object_info)),
+                'camera': image_observation,
             }
+
         else:
             raise NotImplementedError
 
