@@ -15,6 +15,60 @@ import robomimic.envs.env_base as EB
 import robomimic.envs.env_gym as EG
 import gym
 
+
+class EnvRLkitWrapperDummy:
+    def __init__(
+            self,
+            action_dim,
+            obs_dim,
+            obs_img_dim=48,  # rendered image size
+            transpose_image=True,  # transpose for pytorch by default
+            camera_names=['agentview'],
+            observation_mode='pixels',
+    ):
+        self.action_dim = action_dim
+        self.obs_dim = obs_dim
+
+        self.observation_mode = observation_mode
+        assert self.observation_mode in ["pixels", "states"]
+        self.obs_img_dim = obs_img_dim
+        self.transpose_image = transpose_image
+        self.camera_names = camera_names
+        self._set_observation_space()
+        self._set_action_space()
+        self._init_obs()
+
+    def _init_obs(self):
+        image_modalities = ["image"]
+        obs_modality_specs = {
+            "obs": {
+                "low_dim": [],  # technically unused, so we don't have to specify all of them
+                "image": image_modalities,
+            }
+        }
+        ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs)
+
+    def _set_action_space(self):
+        act_bound = 1
+        act_high = np.ones(self.action_dim) * act_bound
+        self.action_space = gym.spaces.Box(-act_high, act_high)
+
+    def _set_observation_space(self):
+        if self.observation_mode == 'pixels':
+            self.image_length = (self.obs_img_dim ** 2) * 3
+            img_space = gym.spaces.Box(0, 1, (self.image_length,),
+                                       dtype=np.float32)
+
+            obs_bound = 100
+            obs_high = np.ones(self.obs_dim) * obs_bound
+            state_space = gym.spaces.Box(-obs_high, obs_high)
+            spaces = {'state': state_space}
+            for name in self.camera_names:
+                spaces[name] = img_space
+            self.observation_space = gym.spaces.Dict(spaces)
+        else:
+            raise NotImplementedError
+
 class EnvRLkitWrapper(EB.EnvBase):
     def __init__(
         self,
