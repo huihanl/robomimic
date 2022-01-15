@@ -77,6 +77,7 @@ class EnvRLkitWrapper(EB.EnvBase):
         transpose_image=True,  # transpose for pytorch by default
         camera_names=['agentview'],
         observation_mode='pixels',
+        take_video=False,
     ):
         self.env = env_robosuite
         self.observation_mode = observation_mode
@@ -87,6 +88,7 @@ class EnvRLkitWrapper(EB.EnvBase):
         self._set_observation_space()
         self._set_action_space()
         self._init_obs()
+        self.take_video = take_video
 
     def _init_obs(self):
         image_modalities = ["image"]
@@ -119,7 +121,6 @@ class EnvRLkitWrapper(EB.EnvBase):
                 spaces[name] = img_space
             self.observation_space = gym.spaces.Dict(spaces)
         elif self.observation_mode == 'states':
-            print("self.env.name: ", self.env.name)
             if "Lift" in self.env.name:
                 robot_state_dim = 9 + 10 # XYZ (3) + QUAT (4) + GRIPPER_STATE (2) + OBJECT_INFO
             elif "Can" in self.env.name or "Square" in self.env.name:
@@ -193,13 +194,25 @@ class EnvRLkitWrapper(EB.EnvBase):
                     observation['image'] = image_observation
 
         elif self.observation_mode == 'states':
+
+            #image_observation = self.env.render(mode="rgb_array",
+            #                                    height=self.obs_img_dim,
+            #                                    width=self.obs_img_dim,
+            #                                    camera_name=self.camera_names[0])
+
+            #if self.transpose_image:
+            #    image_observation = np.transpose(image_observation, (2, 0, 1))
+            #image_observation = np.float32(image_observation.flatten()) / 255.0
+
             observation = {
                 'state': np.concatenate(
                     (robot0_eef_pos,
                      robot0_eef_quat,
                      robot0_gripper_qpos,
                      object_info)),
+                #'camera': image_observation,
             }
+
         else:
             raise NotImplementedError
 

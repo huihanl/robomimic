@@ -87,7 +87,6 @@ def playback_dataset(args):
         if is_robosuite_env:
             initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
 
-
         for cam_name in args.camera_names:
             video = playback_video(
                 env=env, 
@@ -104,7 +103,6 @@ def playback_dataset(args):
             # for v in video:
             #     video_writer.append_data(v)
             # video_writer.close()
-
     f.close()
     return video_lst_keys
 
@@ -222,7 +220,6 @@ if __name__ == "__main__":
         ee_quat = f["data/{}/obs/robot0_eef_quat".format(ep)][()]
         gripper_pos = f["data/{}/obs/robot0_gripper_qpos".format(ep)][()]
         object_info = f["data/{}/obs/object".format(ep)][()]
-        import pdb; pdb.set_trace()
         
         obs = np.concatenate([ee_pos, ee_quat, gripper_pos, object_info], axis=1)
         obs = list(obs)
