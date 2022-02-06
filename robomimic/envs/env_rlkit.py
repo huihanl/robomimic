@@ -146,63 +146,15 @@ class EnvRLkitWrapper(EB.EnvBase):
 
         if self.observation_mode == 'pixels':
 
-            if len(self.camera_names) == 1:
-                image_observation = self.env.render(mode="rgb_array",
-                                                    height=self.obs_img_dim,
-                                                    width=self.obs_img_dim,
-                                                    camera_name=self.camera_names[0])
-
-                if self.transpose_image:
-                    image_observation = np.transpose(image_observation, (2, 0, 1))
-                image_observation = np.float32(image_observation.flatten()) / 255.0
-
-                observation = {
-                    'state': np.concatenate(
-                        (robot0_eef_pos,
-                         robot0_eef_quat,
-                         robot0_gripper_qpos)),
-                         #object_info)),
-                    'image': image_observation
-                }
-            else:
-                observation = {
-                    'state': np.concatenate(
-                        (robot0_eef_pos,
-                         robot0_eef_quat,
-                         robot0_gripper_qpos)),
-                         #object_info))
-                }
-                for i in range(len(self.camera_names)):
-                    image_observation = self.env.render(mode="rgb_array",
-                                                        height=self.obs_img_dim,
-                                                        width=self.obs_img_dim,
-                                                        camera_name=self.camera_names[i])
-
-                    if self.transpose_image:
-                        image_observation = np.transpose(image_observation, (2, 0, 1))
-                    image_observation = np.float32(image_observation.flatten()) / 255.0
-                    observation[self.camera_names[i]] = image_observation
-
-                    image_observation = self.env.render(mode="rgb_array",
-                                                        height=self.obs_img_dim,
-                                                        width=self.obs_img_dim,
-                                                        camera_name='frontview')
-
-                    if self.transpose_image:
-                        image_observation = np.transpose(image_observation, (2, 0, 1))
-                    image_observation = np.float32(image_observation.flatten()) / 255.0
-                    observation['image'] = image_observation
+            observation = {
+                'state': np.concatenate(
+                    (robot0_eef_pos,
+                     robot0_eef_quat,
+                     robot0_gripper_qpos)),
+            }
+            # Note: only obtain images obs in offline eval script  
 
         elif self.observation_mode == 'states':
-
-            #image_observation = self.env.render(mode="rgb_array",
-            #                                    height=self.obs_img_dim,
-            #                                    width=self.obs_img_dim,
-            #                                    camera_name=self.camera_names[0])
-
-            #if self.transpose_image:
-            #    image_observation = np.transpose(image_observation, (2, 0, 1))
-            #image_observation = np.float32(image_observation.flatten()) / 255.0
 
             observation = {
                 'state': np.concatenate(
@@ -210,7 +162,6 @@ class EnvRLkitWrapper(EB.EnvBase):
                      robot0_eef_quat,
                      robot0_gripper_qpos,
                      object_info)),
-                #'camera': image_observation,
             }
 
         else:
